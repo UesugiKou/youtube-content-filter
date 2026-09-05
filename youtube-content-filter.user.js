@@ -1,15 +1,18 @@
 // ==UserScript==
 // @name         YouTube 内容过滤器 (Shorts/直播/视频/游戏)
 // @name:en      YouTube Content Filter (Shorts/Live/Videos/Gaming)
-// @namespace    https://github.com/
+// @namespace    https://github.com/UesugiKou/youtube-content-filter
 // @version      1.0.0
 // @description  便捷分别屏蔽 YouTube 上的 Shorts 短视频、直播内容、常规视频、游戏板块，支持可视化悬浮面板与油猴菜单分别独立管理。
-// @author       Antigravity
+// @author       UesugiKou
 // @match        https://www.youtube.com/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @run-at       document-start
+// @license      MIT
+// @updateURL    https://UesugiKou.github.io/youtube-content-filter/youtube-content-filter.user.js
+// @downloadURL  https://UesugiKou.github.io/youtube-content-filter/youtube-content-filter.user.js
 // ==/UserScript==
 
 (function () {
