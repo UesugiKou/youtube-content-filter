@@ -1,0 +1,20 @@
+{
+  "name": "youtube-content-filter",
+  "version": "1.0.0",
+  "description": "A Tampermonkey userscript to filter out YouTube Shorts, Live streams, Standard videos, and Gaming section with a sleek in-page settings panel.",
+  "main": "youtube-content-filter.user.js",
+  "scripts": {
+    "test": "node -c youtube-content-filter.user.js"
+  },
+  "keywords": [
+    "tampermonkey",
+    "userscript",
+    "youtube",
+    "youtube-shorts",
+    "filter",
+    "adblock",
+    "cleaner"
+  ],
+  "author": "UesugiKou <sonarda@outlook.com>",
+  "license": "MIT"
+}
