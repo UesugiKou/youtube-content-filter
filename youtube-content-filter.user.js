@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         YouTube 内容过滤器 (Shorts/直播/视频/游戏)
-// @name:en      YouTube Content Filter (Shorts/Live/Videos/Gaming)
+// @name         YouTube 内容过滤器 (Shorts/直播/视频/游戏/精选)
+// @name:en      YouTube Content Filter (Shorts/Live/Videos/Gaming/Featured)
 // @namespace    https://github.com/UesugiKou/youtube-content-filter
-// @version      1.0.0
-// @description  便捷分别屏蔽 YouTube 上的 Shorts 短视频、直播内容、常规视频、游戏板块，支持可视化悬浮面板与油猴菜单分别独立管理。
+// @version      1.1.0
+// @description  便捷分别屏蔽 YouTube 上的 Shorts 短视频、直播内容、常规视频、游戏板块与 YouTube 精选推荐合辑，支持可视化悬浮面板与油猴菜单分别独立管理。
 // @author       UesugiKou
 // @match        https://www.youtube.com/*
 // @grant        GM_getValue
@@ -23,6 +23,7 @@
         blockShorts: true,       // 屏蔽 Shorts
         blockLive: false,        // 屏蔽 直播
         blockGaming: true,       // 屏蔽 游戏板块
+        blockFeatured: true,     // 屏蔽 YouTube精选 / 合辑
         blockVideos: false,      // 屏蔽 常规长视频
         blockPosts: false,       // 屏蔽 社区动态与合辑
         showFloatingBtn: true    // 显示右下角设置浮标
@@ -35,6 +36,7 @@
                 blockShorts: GM_getValue('blockShorts', DEFAULT_CONFIG.blockShorts),
                 blockLive: GM_getValue('blockLive', DEFAULT_CONFIG.blockLive),
                 blockGaming: GM_getValue('blockGaming', DEFAULT_CONFIG.blockGaming),
+                blockFeatured: GM_getValue('blockFeatured', DEFAULT_CONFIG.blockFeatured),
                 blockVideos: GM_getValue('blockVideos', DEFAULT_CONFIG.blockVideos),
                 blockPosts: GM_getValue('blockPosts', DEFAULT_CONFIG.blockPosts),
                 showFloatingBtn: GM_getValue('showFloatingBtn', DEFAULT_CONFIG.showFloatingBtn)
@@ -142,7 +144,40 @@
             `;
         }
 
-        // 4. 屏蔽 常规长视频 规则 (通常用于只浏览社区、特定专区或极致防沉迷)
+        // 4. 屏蔽 YouTube 精选 / 合辑 (Featured & Mixes) 规则
+        if (cfg.blockFeatured) {
+            css += `
+                /* 首页/信息流中的 YouTube 精选专区与货架 */
+                ytd-rich-section-renderer:has(#featured-badge),
+                ytd-rich-shelf-renderer:has(#featured-badge),
+                /* 首页/信息流/推荐流中的 YouTube 自动生成 Mix / 精选合辑卡片 */
+                ytd-rich-item-renderer:has(a[href*="start_radio=1"]),
+                ytd-rich-item-renderer:has(a[href*="list=RD"]),
+                ytd-rich-item-renderer:has(ytd-radio-renderer),
+                ytd-rich-item-renderer:has(ytd-compact-radio-renderer),
+                ytd-video-renderer:has(a[href*="start_radio=1"]),
+                ytd-video-renderer:has(a[href*="list=RD"]),
+                ytd-video-renderer:has(ytd-radio-renderer),
+                ytd-compact-video-renderer:has(a[href*="start_radio=1"]),
+                ytd-compact-video-renderer:has(a[href*="list=RD"]),
+                ytd-compact-video-renderer:has(ytd-radio-renderer),
+                ytd-grid-video-renderer:has(a[href*="start_radio=1"]),
+                ytd-grid-video-renderer:has(a[href*="list=RD"]),
+                ytd-radio-renderer,
+                ytd-compact-radio-renderer,
+                .ytp-videowall-still[data-is-mix="true"],
+                /* 带有精选标识的单个视频推荐卡片 */
+                ytd-rich-item-renderer:has(#featured-badge),
+                ytd-video-renderer:has(#featured-badge),
+                ytd-compact-video-renderer:has(#featured-badge),
+                /* 备用标记属性选择器 */
+                [data-yt-filter-type="featured"] {
+                    display: none !important;
+                }
+            `;
+        }
+
+        // 5. 屏蔽 常规长视频 规则 (通常用于只浏览社区、特定专区或极致防沉迷)
         if (cfg.blockVideos) {
             css += `
                 /* 首页与信息流中的普通视频项目 (排除已被 Shorts 或直播匹配的，避免误判) */
@@ -156,7 +191,7 @@
             `;
         }
 
-        // 5. 屏蔽 社区动态与合辑
+        // 6. 屏蔽 社区动态与合辑
         if (cfg.blockPosts) {
             css += `
                 ytd-rich-section-renderer:has(ytd-post-renderer),
@@ -221,6 +256,43 @@
                 }
             }
         }
+
+        // 标记 YouTube 精选 / 合辑 (Featured & Mixes)
+        if (currentConfig.blockFeatured) {
+            // 货架专区检查
+            if (node.tagName === 'YTD-RICH-SECTION-RENDERER' || node.tagName === 'YTD-RICH-SHELF-RENDERER') {
+                const titleEl = node.querySelector('#title-container, #title, #title-text, yt-formatted-string#title, h2');
+                const titleText = titleEl ? titleEl.textContent.trim() : '';
+                const hasFeaturedBmp = node.querySelector('#featured-badge, [aria-label*="Featured" i], [aria-label*="精选" i], [aria-label*="精選" i]');
+                if (hasFeaturedBmp || /YouTube\s*精[选選]|精[选選]|Featured|Spotlight/i.test(titleText)) {
+                    node.setAttribute('data-yt-filter-type', 'featured');
+                    return;
+                }
+            }
+
+            // 单个视频 / 合辑卡片检查
+            if (node.tagName === 'YTD-RICH-ITEM-RENDERER' || node.tagName === 'YTD-VIDEO-RENDERER' || node.tagName === 'YTD-COMPACT-VIDEO-RENDERER') {
+                const hasMix = node.querySelector('a[href*="start_radio=1"], a[href*="list=RD"], ytd-radio-renderer, ytd-compact-radio-renderer');
+                if (hasMix) {
+                    node.setAttribute('data-yt-filter-type', 'featured');
+                    return;
+                }
+
+                const hasFeaturedBmp = node.querySelector('#featured-badge, [aria-label*="Featured" i], [aria-label*="精选" i], [aria-label*="精選" i]');
+                if (hasFeaturedBmp) {
+                    node.setAttribute('data-yt-filter-type', 'featured');
+                    return;
+                }
+
+                const badges = node.querySelectorAll('ytd-badge-supported-renderer, .badge, #badges');
+                for (const b of badges) {
+                    if (/精[选選]|Featured/i.test(b.textContent || '')) {
+                        node.setAttribute('data-yt-filter-type', 'featured');
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     // 轻量级节流观察器
@@ -229,7 +301,7 @@
         if (mutationTimer) return;
         mutationTimer = setTimeout(() => {
             mutationTimer = null;
-            const items = document.querySelectorAll('ytd-rich-item-renderer:not([data-yt-filter-type]), ytd-video-renderer:not([data-yt-filter-type]), ytd-compact-video-renderer:not([data-yt-filter-type])');
+            const items = document.querySelectorAll('ytd-rich-section-renderer:not([data-yt-filter-type]), ytd-rich-shelf-renderer:not([data-yt-filter-type]), ytd-rich-item-renderer:not([data-yt-filter-type]), ytd-video-renderer:not([data-yt-filter-type]), ytd-compact-video-renderer:not([data-yt-filter-type])');
             items.forEach(scanAndMarkItem);
         }, 300);
     });
@@ -519,6 +591,17 @@
 
                     <div class="yt-filter-item">
                         <div class="yt-filter-label">
+                            <span class="yt-filter-name">✨ 屏蔽 YouTube精选 / 合辑</span>
+                            <span class="yt-filter-desc">隐藏首页“YouTube精选”货架、官方自动生成的精选合辑 (Mixes) 与精选推荐卡片</span>
+                        </div>
+                        <label class="yt-filter-switch">
+                            <input type="checkbox" id="cfg-blockFeatured" ${currentConfig.blockFeatured ? 'checked' : ''}>
+                            <span class="yt-filter-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="yt-filter-item">
+                        <div class="yt-filter-label">
                             <span class="yt-filter-name">🎬 屏蔽 常规长视频</span>
                             <span class="yt-filter-desc">隐藏主页信息流的普通视频（适合防沉迷或仅使用订阅/播放列表）</span>
                         </div>
@@ -530,8 +613,8 @@
 
                     <div class="yt-filter-item">
                         <div class="yt-filter-label">
-                            <span class="yt-filter-name">📰 屏蔽 社区动态与官方合辑</span>
-                            <span class="yt-filter-desc">隐藏投票、帖子动态以及 YouTube 自动生成的 Mixes</span>
+                            <span class="yt-filter-name">📰 屏蔽 社区动态与图文帖子</span>
+                            <span class="yt-filter-desc">隐藏首页与推荐流中的粉丝投票、社区图文动态帖子与播放列表合集</span>
                         </div>
                         <label class="yt-filter-switch">
                             <input type="checkbox" id="cfg-blockPosts" ${currentConfig.blockPosts ? 'checked' : ''}>
@@ -595,6 +678,7 @@
         bindSwitch('cfg-blockShorts', 'blockShorts');
         bindSwitch('cfg-blockLive', 'blockLive');
         bindSwitch('cfg-blockGaming', 'blockGaming');
+        bindSwitch('cfg-blockFeatured', 'blockFeatured');
         bindSwitch('cfg-blockVideos', 'blockVideos');
         bindSwitch('cfg-blockPosts', 'blockPosts');
         bindSwitch('cfg-showFloatingBtn', 'showFloatingBtn');
@@ -632,6 +716,13 @@
 
         GM_registerMenuCommand(`🎮 切换 游戏板块 屏蔽: ${currentConfig.blockGaming ? '【已开启】' : '【已关闭】'}`, () => {
             currentConfig.blockGaming = !currentConfig.blockGaming;
+            saveConfig(currentConfig);
+            updateStyles();
+            location.reload();
+        });
+
+        GM_registerMenuCommand(`✨ 切换 YouTube精选 屏蔽: ${currentConfig.blockFeatured ? '【已开启】' : '【已关闭】'}`, () => {
+            currentConfig.blockFeatured = !currentConfig.blockFeatured;
             saveConfig(currentConfig);
             updateStyles();
             location.reload();
